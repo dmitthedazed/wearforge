@@ -1,0 +1,27 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Packaging / build artifacts
+build/
+dist/
+*.egg-info/
+.eggs/
+
+# Test / tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Runtime data is stored in the XDG data dir by default, but ignore any local
+# copies if WEARFORGE_DATA_DIR points at the project during development.
+backups/
+screenshots/
+recordings/
+*.log
+debloated_history.json
+connection_history.json
+uad_lists_cache.json
+uad_lists_db.json
