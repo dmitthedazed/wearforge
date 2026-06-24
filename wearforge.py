@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 import sys
 import os
+import time
+import platform
 import subprocess
 import json
 import re
@@ -13,7 +15,13 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 APP_NAME = "WearForge"
-APP_VERSION = "1.2.0"
+APP_VERSION = "1.3.0"
+
+# --- Operating-system detection (Linux / Windows / macOS) ---
+_SYSTEM = platform.system()  # "Linux", "Windows", "Darwin"
+IS_WINDOWS = _SYSTEM == "Windows"
+IS_MACOS = _SYSTEM == "Darwin"
+IS_LINUX = _SYSTEM == "Linux"
 
 # Import interactive CLI libraries
 try:
@@ -26,17 +34,29 @@ try:
     from rich.live import Live
     from rich.progress import Progress, SpinnerColumn, BarColumn, TextColumn
 except ImportError:
-    print("Error: Required dependencies not found. Please run the app using './run.sh'")
+    print(
+        "Error: required dependencies not found.\n"
+        "Install them with:  pip install rich questionary\n"
+        "or run the bundled launcher (./run.sh on Linux/macOS, .\\run.ps1 on Windows)."
+    )
     sys.exit(1)
 
-# Import tty/termios for raw keyboard input (Linux standard library)
+# Raw single-keypress input is platform-specific: termios/tty on POSIX
+# (Linux/macOS), msvcrt on Windows. Whichever is available is used by getch().
 try:
     import tty
     import termios
 except ImportError:
-    # Fallback if run on a non-POSIX platform, though user OS is Linux
     tty = None
     termios = None
+
+try:
+    import msvcrt  # Windows-only
+except ImportError:
+    msvcrt = None
+
+# True when we can read individual keypresses (needed for the live-typing mirror).
+RAW_INPUT_SUPPORTED = bool(msvcrt) or bool(tty and termios)
 
 # Initialize Rich Console
 console = Console()
@@ -47,16 +67,28 @@ logger = logging.getLogger("wearforge")
 def get_data_dir():
     """Resolve a stable, writable directory for app state, independent of CWD.
 
-    Priority: ``WEARFORGE_DATA_DIR`` env override → ``$XDG_DATA_HOME/wearforge``
-    → ``~/.local/share/wearforge``. Keeping state here (instead of the current
-    directory) means the tool behaves the same whether launched via ./run.sh,
-    a console entry point, or from any working directory.
+    Per-OS conventions (after the ``WEARFORGE_DATA_DIR`` override):
+      * Windows → ``%LOCALAPPDATA%\\WearForge``
+      * macOS   → ``~/Library/Application Support/WearForge``
+      * Linux   → ``$XDG_DATA_HOME/wearforge`` else ``~/.local/share/wearforge``
+
+    Keeping state here (instead of the current directory) means the tool behaves
+    the same whether launched via ./run.sh, a console entry point, or from any
+    working directory.
     """
     override = os.environ.get("WEARFORGE_DATA_DIR")
     if override:
         return os.path.abspath(os.path.expanduser(override))
+
+    home = os.path.expanduser("~")
+    if IS_WINDOWS:
+        base = os.environ.get("LOCALAPPDATA") or os.path.join(home, "AppData", "Local")
+        return os.path.join(base, "WearForge")
+    if IS_MACOS:
+        return os.path.join(home, "Library", "Application Support", "WearForge")
+    # Linux / other POSIX
     xdg = os.environ.get("XDG_DATA_HOME")
-    base = xdg if xdg else os.path.join(os.path.expanduser("~"), ".local", "share")
+    base = xdg if xdg else os.path.join(home, ".local", "share")
     return os.path.join(base, "wearforge")
 
 
@@ -693,7 +725,13 @@ def suggest_subnet():
 
 # --- Helper for Single Keyboard Keypress ---
 def getch():
-    """Reads a single keypress from standard input in raw terminal mode."""
+    """Read a single keypress, raw (no Enter needed). Cross-platform.
+
+    Windows uses msvcrt; POSIX (Linux/macOS) uses termios raw mode. Returns a
+    single character string (e.g. '\\x1b' for Esc, '\\r' for Enter).
+    """
+    if msvcrt:  # Windows
+        return msvcrt.getwch()
     if not tty or not termios:
         return sys.stdin.read(1)
     fd = sys.stdin.fileno()
@@ -704,6 +742,32 @@ def getch():
     finally:
         termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
     return ch
+
+
+def wait_for_keypress(timeout):
+    """Non-blocking poll: return True if the user pressed a key within `timeout`
+    seconds, consuming any pending input. Cross-platform (msvcrt / select)."""
+    if msvcrt:  # Windows
+        deadline = time.time() + timeout
+        pressed = False
+        while time.time() < deadline:
+            if msvcrt.kbhit():
+                while msvcrt.kbhit():
+                    msvcrt.getwch()
+                pressed = True
+                break
+            time.sleep(0.02)
+        return pressed
+    try:
+        import select
+        r, _, _ = select.select([sys.stdin], [], [], timeout)
+        if r:
+            sys.stdin.readline()
+            return True
+        return False
+    except Exception:
+        time.sleep(timeout)
+        return False
 
 # --- Screens & UI Setup ---
 
@@ -1472,9 +1536,11 @@ def interact_tools_menu():
             console.print("[red]Error: 'scrcpy' executable was not found on your system PATH.[/red]")
             console.print("ScrCpy is required to mirror and control the watch interface.")
             console.print("How to install:")
-            console.print("  - Arch Linux:  [cyan]sudo pacman -S scrcpy[/cyan]")
+            console.print("  - Arch Linux:    [cyan]sudo pacman -S scrcpy[/cyan]")
             console.print("  - Ubuntu/Debian: [cyan]sudo apt install scrcpy[/cyan]")
-            console.print("  - Fedora:      [cyan]sudo dnf install scrcpy[/cyan]")
+            console.print("  - Fedora:        [cyan]sudo dnf install scrcpy[/cyan]")
+            console.print("  - macOS:         [cyan]brew install scrcpy[/cyan]")
+            console.print("  - Windows:       [cyan]winget install Genymobile.scrcpy[/cyan] (or [cyan]choco install scrcpy[/cyan])")
         else:
             console.print(f"[green]Launching ScrCpy screen mirror for watch: {selected_device}...[/green]")
             # Launch in background
@@ -1496,7 +1562,7 @@ def interact_tools_menu():
             questionary.press_any_key_to_continue().ask()
             
     elif "Use PC Keyboard" in choice:
-        if not tty or not termios:
+        if not RAW_INPUT_SUPPORTED:
             console.print("[red]Real-time raw keypress listeners are not supported on this platform console.[/red]")
             questionary.press_any_key_to_continue().ask()
             return
@@ -1594,7 +1660,8 @@ def screen_capture_menu():
         console.print("\n[yellow]Starting video screen record...[/yellow]")
         console.print("[bold red]Please interact with your watch now.[/bold red]")
         console.print(f"Record session will automatically terminate in {limit} seconds.")
-        console.print("Press [bold cyan]ENTER[/bold cyan] in this console to terminate recording early...\n")
+        stop_hint = "any key" if IS_WINDOWS else "ENTER"
+        console.print(f"Press [bold cyan]{stop_hint}[/bold cyan] in this console to terminate recording early...\n")
         
         # Start screenrecord process in background
         proc = subprocess.Popen([
@@ -1602,33 +1669,24 @@ def screen_capture_menu():
             '--time-limit', limit, '--size', '360x360', '/sdcard/temp_record.mp4'
         ], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         
-        # We wait for user keypress to stop or process to finish
-        import select
-        
+        # Wait for the user to press a key (stop early) or the process to finish.
+        # wait_for_keypress is cross-platform (select on POSIX, msvcrt on Windows).
         try:
-            # Wait for either process to terminate or stdin input
-            # select.select monitors file descriptors
-            finished = False
-            while not finished:
-                # If process has finished on its own
+            while True:
+                # If process has finished on its own (hit the time limit)
                 if proc.poll() is not None:
-                    finished = True
                     break
-                    
-                # Non-blocking check for Enter key on stdin
-                # Wait up to 0.5s
-                r, w, x = select.select([sys.stdin], [], [], 0.5)
-                if r:
-                    sys.stdin.readline() # Consume input line
+
+                # Non-blocking check for a keypress, up to 0.5s
+                if wait_for_keypress(0.5):
                     console.print("[yellow]Stopping recording early...[/yellow]")
                     # Find PID of screenrecord on the watch and send SIGINT (2)
                     rc_pid, stdout_pid, _ = run_adb(['shell', 'pidof', 'screenrecord'], selected_device)
                     if rc_pid == 0 and stdout_pid.strip():
                         run_adb(['shell', 'kill', '-2', stdout_pid.strip()], selected_device)
-                    finished = True
                     break
         except Exception:
-            # Fallback if select is interrupted
+            # Fallback if the wait is interrupted
             proc.terminate()
             
         proc.wait() # Make sure process fully exits
