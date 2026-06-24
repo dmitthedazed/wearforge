@@ -90,7 +90,14 @@ def test_make_pkg_choice_collapses_description_whitespace():
 
 # --- data dir resolution ---------------------------------------------------
 
+def _force_os(monkeypatch, *, windows=False, macos=False, linux=False):
+    monkeypatch.setattr(wf, "IS_WINDOWS", windows)
+    monkeypatch.setattr(wf, "IS_MACOS", macos)
+    monkeypatch.setattr(wf, "IS_LINUX", linux)
+
+
 def test_get_data_dir_env_override(monkeypatch, tmp_path):
+    # Override wins regardless of OS.
     monkeypatch.setenv("WEARFORGE_DATA_DIR", str(tmp_path / "custom"))
     assert wf.get_data_dir() == str(tmp_path / "custom")
 
@@ -102,17 +109,33 @@ def test_get_data_dir_expands_user(monkeypatch):
     assert out.endswith("wf-test-dir")
 
 
-def test_get_data_dir_uses_xdg(monkeypatch, tmp_path):
+def test_get_data_dir_linux_uses_xdg(monkeypatch, tmp_path):
     monkeypatch.delenv("WEARFORGE_DATA_DIR", raising=False)
+    _force_os(monkeypatch, linux=True)
     monkeypatch.setenv("XDG_DATA_HOME", str(tmp_path))
     assert wf.get_data_dir() == str(tmp_path / "wearforge")
 
 
-def test_get_data_dir_default_location(monkeypatch):
+def test_get_data_dir_linux_default_location(monkeypatch):
     monkeypatch.delenv("WEARFORGE_DATA_DIR", raising=False)
     monkeypatch.delenv("XDG_DATA_HOME", raising=False)
+    _force_os(monkeypatch, linux=True)
     out = wf.get_data_dir()
     assert out.endswith(os.path.join(".local", "share", "wearforge"))
+
+
+def test_get_data_dir_windows(monkeypatch, tmp_path):
+    monkeypatch.delenv("WEARFORGE_DATA_DIR", raising=False)
+    _force_os(monkeypatch, windows=True)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
+    assert wf.get_data_dir() == os.path.join(str(tmp_path), "WearForge")
+
+
+def test_get_data_dir_macos(monkeypatch):
+    monkeypatch.delenv("WEARFORGE_DATA_DIR", raising=False)
+    _force_os(monkeypatch, macos=True)
+    out = wf.get_data_dir()
+    assert out.endswith(os.path.join("Library", "Application Support", "WearForge"))
 
 
 # --- argument parsing ------------------------------------------------------

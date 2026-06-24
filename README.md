@@ -2,7 +2,8 @@
 
 [![CI](https://github.com/dmitthedazed/wearforge/actions/workflows/ci.yml/badge.svg)](https://github.com/dmitthedazed/wearforge/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8%2B-blue.svg)](https://www.python.org/)
+[![Python 3.9+](https://img.shields.io/badge/python-3.9%2B-blue.svg)](https://www.python.org/)
+[![Platforms](https://img.shields.io/badge/platforms-Linux%20%7C%20macOS%20%7C%20Windows-informational)](#install)
 
 **An all-in-one ADB toolkit for Wear OS — debloat, tweak, back up, and manage
 your watch from the terminal.** A single interactive TUI built with
@@ -40,15 +41,21 @@ All debloat actions default to the reversible **disable** (`pm disable-user`)
 rather than uninstall, and every change is logged so it can be undone from the
 Restore menu.
 
+Runs on **Linux, macOS, and Windows** — the right platform behavior (data
+directory, raw keyboard input) is detected automatically at runtime.
+
 ## Requirements
 
-- Python 3.8+
+- Python 3.9+
 - [`adb`](https://developer.android.com/tools/adb) (Android platform-tools) on
-  your `PATH` — e.g. `sudo pacman -S android-tools` or `sudo apt install adb`.
+  your `PATH`:
+  - Linux: `sudo apt install adb` / `sudo pacman -S android-tools`
+  - macOS: `brew install android-platform-tools`
+  - Windows: `winget install Google.PlatformTools`
 
 ## Install
 
-**With pipx (recommended):**
+**With pipx (recommended, all platforms):**
 
 ```bash
 pipx install git+https://github.com/dmitthedazed/wearforge.git
@@ -63,12 +70,20 @@ wearforge
 ```
 
 **From source (zero-install launcher):** the bundled script creates a
-virtualenv, installs dependencies, and launches the app:
+virtualenv, installs dependencies, and launches the app.
 
 ```bash
+# Linux / macOS
 git clone https://github.com/dmitthedazed/wearforge.git
 cd wearforge
 ./run.sh
+```
+
+```powershell
+# Windows (PowerShell)
+git clone https://github.com/dmitthedazed/wearforge.git
+cd wearforge
+.\run.ps1
 ```
 
 ## Usage
@@ -105,9 +120,16 @@ wearforge --verbose                    # also stream debug logs to the console
 ## Data & logs
 
 State is stored outside the working directory so the tool behaves the same from
-anywhere. By default everything lives under
-`~/.local/share/wearforge/` (override with the `WEARFORGE_DATA_DIR` environment
-variable, or `XDG_DATA_HOME`):
+anywhere. The location follows each OS's convention (override any of them with
+the `WEARFORGE_DATA_DIR` environment variable):
+
+| OS | Default data directory |
+| --- | --- |
+| Linux | `$XDG_DATA_HOME/wearforge` or `~/.local/share/wearforge` |
+| macOS | `~/Library/Application Support/WearForge` |
+| Windows | `%LOCALAPPDATA%\WearForge` |
+
+It contains:
 
 - `backups/`, `screenshots/`, `recordings/` — output folders.
 - `debloated_history.json`, `connection_history.json` — local state.
@@ -122,7 +144,8 @@ pip install -e ".[dev]"
 pytest
 ```
 
-CI runs byte-compile + tests on Python 3.8 / 3.10 / 3.12 via GitHub Actions.
+CI runs byte-compile + tests on Linux, macOS, and Windows (Python 3.9 & 3.12)
+via GitHub Actions.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, how to add a
 debloat catalog entry, testing notes, and the PR workflow.
