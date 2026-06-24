@@ -124,6 +124,9 @@ pytest
 
 CI runs byte-compile + tests on Python 3.8 / 3.10 / 3.12 via GitHub Actions.
 
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the project layout, how to add a
+debloat catalog entry, testing notes, and the PR workflow.
+
 ## Disclaimer
 
 Debloating system packages can affect device functionality. Prefer **disable**
