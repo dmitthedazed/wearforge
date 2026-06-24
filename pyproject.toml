@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "wearforge"
+version = "1.2.0"
+description = "An all-in-one ADB toolkit for Wear OS: debloat, tweak, back up, and manage your watch from the terminal."
+readme = "README.md"
+requires-python = ">=3.8"
+license = { text = "MIT" }
+authors = [{ name = "Dmytrii Savin" }]
+keywords = ["wear-os", "android", "adb", "debloat", "uad", "smartwatch", "cli", "tui"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Environment :: Console",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Topic :: Utilities",
+]
+dependencies = [
+    "rich>=13.7.0,<15",
+    "questionary>=2.0.1,<3",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7.0"]
+
+[project.urls]
+Homepage = "https://github.com/dmitthedazed/wearforge"
+Repository = "https://github.com/dmitthedazed/wearforge"
+Issues = "https://github.com/dmitthedazed/wearforge/issues"
+
+[project.scripts]
+wearforge = "wearforge:main"
+
+[tool.setuptools]
+py-modules = ["wearforge"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
