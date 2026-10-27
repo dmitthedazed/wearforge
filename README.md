@@ -34,14 +34,6 @@ Needs Python 3.9+ and [adb](https://developer.android.com/tools/adb).
 pipx install git+https://github.com/dmitthedazed/wearforge.git
 ```
 
-Or run from a clone without installing anything globally:
-
-```sh
-git clone https://github.com/dmitthedazed/wearforge.git
-cd wearforge
-./run.sh        # Windows: .\run.ps1
-```
-
 </details>
 
 ## Features

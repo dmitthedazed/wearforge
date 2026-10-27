@@ -36,8 +36,7 @@ try:
 except ImportError:
     print(
         "Error: required dependencies not found.\n"
-        "Install them with:  pip install rich questionary\n"
-        "or run the bundled launcher (./run.sh on Linux/macOS, .\\run.ps1 on Windows)."
+        "Install them with:  pip install rich questionary"
     )
     sys.exit(1)
 
@@ -136,7 +135,7 @@ def get_data_dir():
       * Linux   → ``$XDG_DATA_HOME/wearforge`` else ``~/.local/share/wearforge``
 
     Keeping state here (instead of the current directory) means the tool behaves
-    the same whether launched via ./run.sh, a console entry point, or from any
+    the same whether launched via the console entry point, `python wearforge.py`, or from any
     working directory.
     """
     override = os.environ.get("WEARFORGE_DATA_DIR")
