@@ -15,7 +15,7 @@ from logging.handlers import RotatingFileHandler
 from datetime import datetime
 
 APP_NAME = "WearForge"
-APP_VERSION = "1.3.0"
+APP_VERSION = "1.4.0"
 
 # --- Operating-system detection (Linux / Windows / macOS) ---
 _SYSTEM = platform.system()  # "Linux", "Windows", "Darwin"
