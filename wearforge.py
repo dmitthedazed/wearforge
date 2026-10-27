@@ -61,6 +61,69 @@ RAW_INPUT_SUPPORTED = bool(msvcrt) or bool(tty and termios)
 # Initialize Rich Console
 console = Console()
 
+# --- Theme ---
+# One accent gradient (cyan → violet) plus greys; everything else stays quiet.
+ACCENT = "#5fd7ff"
+ACCENT_2 = "#af87ff"
+MUTED = "#6c7086"
+OK = "#a6e3a1"
+WARN = "#f38ba8"
+
+# Round watch face + wordmark. Kept as plain lines so it can be gradient-tinted.
+# Box-drawing only: quadrant blocks render unevenly in many terminal fonts.
+LOGO_EMBLEM = [
+    "  ┌───┐    ",
+    "╭─┴───┴─╮  ",
+    "│   ╷   │  ",
+    "│   ●─  │  ",
+    "│       │  ",
+    "╰─┬───┬─╯  ",
+    "  └───┘    ",
+]
+LOGO_WORDMARK = [
+    "",
+    "",
+    "╻ ╻┏━╸┏━┓┏━┓┏━╸┏━┓┏━┓┏━╸┏━╸",
+    "┃╻┃┣╸ ┣━┫┣┳┛┣╸ ┃ ┃┣┳┛┃╺┓┣╸ ",
+    "┗┻┛┗━╸╹ ╹╹┗╸╹  ┗━┛╹┗╸┗━┛┗━╸",
+    "",
+    "",
+]
+LOGO_TAGLINE_ROW = 5
+
+QSTYLE = questionary.Style([
+    ("qmark", f"fg:{ACCENT} bold"),
+    ("question", "bold"),
+    ("answer", f"fg:{ACCENT_2}"),
+    ("pointer", f"fg:{ACCENT} bold"),
+    ("highlighted", f"fg:{ACCENT} bold"),
+    ("selected", f"fg:{ACCENT_2}"),
+    ("separator", f"fg:{MUTED}"),
+    ("instruction", f"fg:{MUTED} italic"),
+    ("text", ""),
+    ("disabled", f"fg:{MUTED} italic"),
+])
+
+
+def _themed(fn, **defaults):
+    """Wrap a questionary prompt so every call picks up the WearForge look."""
+    def wrapper(*args, **kwargs):
+        for key, value in defaults.items():
+            kwargs.setdefault(key, value)
+        return fn(*args, **kwargs)
+    wrapper.__wrapped__ = fn
+    return wrapper
+
+
+questionary.select = _themed(questionary.select, style=QSTYLE, qmark="◆", pointer="›")
+questionary.checkbox = _themed(questionary.checkbox, style=QSTYLE, qmark="◆", pointer="›")
+questionary.text = _themed(questionary.text, style=QSTYLE, qmark="◆")
+questionary.confirm = _themed(questionary.confirm, style=QSTYLE, qmark="◆")
+questionary.press_any_key_to_continue = _themed(
+    questionary.press_any_key_to_continue, style=QSTYLE,
+    message="  press any key to continue",
+)
+
 logger = logging.getLogger("wearforge")
 
 
@@ -771,17 +834,70 @@ def wait_for_keypress(timeout):
 
 # --- Screens & UI Setup ---
 
-def show_header(subtitle=""):
-    console.clear()
-    line = f"[bold cyan]⚡ {APP_NAME}[/bold cyan]"
-    if subtitle:
-        line += f"  [dim]›[/dim] [yellow]{subtitle}[/yellow]"
+def _gradient(text, start=ACCENT, end=ACCENT_2, width=None):
+    """Tint text left→right from `start` to `end` (per column, so stacked lines line up)."""
+    from rich.color import Color
+    from rich.text import Text
+    a = Color.parse(start).get_truecolor()
+    b = Color.parse(end).get_truecolor()
+    span = max((width or len(text)) - 1, 1)
+    out = Text()
+    for i, ch in enumerate(text):
+        t = min(i / span, 1.0)
+        rgb = tuple(round(a[k] + (b[k] - a[k]) * t) for k in range(3))
+        out.append(ch, style="#%02x%02x%02x" % rgb)
+    return out
+
+
+def _device_status():
+    from rich.text import Text
     if selected_device:
-        line += f"   [green]{get_device_info(selected_device)}[/green] [dim]({selected_device})[/dim]"
+        return Text.assemble(("● ", OK), (get_device_info(selected_device), "bold"),
+                             ("  " + selected_device, MUTED))
+    return Text.assemble(("○ ", WARN), ("no device", MUTED))
+
+
+def show_logo():
+    from rich.text import Text
+    width = max(len(l) for l in LOGO_WORDMARK)
+    tagline = Text.assemble(("adb toolkit for wear os", MUTED), ("  ·  ", MUTED),
+                            (f"v{APP_VERSION}", MUTED))
+    console.print()
+    for i, (emblem, word) in enumerate(zip(LOGO_EMBLEM, LOGO_WORDMARK)):
+        line = Text("   ")
+        line.append(emblem, style=ACCENT)
+        line.append("   ")
+        if word:
+            line.append_text(_gradient(word, width=width))
+        elif i == LOGO_TAGLINE_ROW:
+            line.append_text(tagline)
+        console.print(line)
+    console.print()
+
+
+def show_header(subtitle=""):
+    """Main Menu gets the full logo; every other screen a one-line breadcrumb."""
+    from rich.table import Table
+    from rich.text import Text
+    console.clear()
+    bar = Table.grid(expand=True, padding=(0, 2))
+    bar.add_column()
+    bar.add_column(justify="right")
+
+    if subtitle == "Main Menu":
+        show_logo()
+        left = Text("   ").append_text(_device_status())
+        right = Text("↑↓ move   ⏎ select   ctrl-c quit", style=MUTED)
     else:
-        line += "   [red]● no device[/red]"
-    console.print(line)
-    console.rule(style="cyan")
+        console.print()
+        left = Text.assemble("   ", ("◉ ", ACCENT), _gradient("wearforge"))
+        if subtitle:
+            left.append_text(Text.assemble(("  ›  ", MUTED), (subtitle.lower(), "bold")))
+        right = _device_status()
+    bar.add_row(left, right)
+    console.print(bar)
+    console.print(Text("   " + "─" * max(console.width - 5, 0), style=MUTED))
+    console.print()
 
 # --- Feature Modules ---
 
@@ -2685,36 +2801,52 @@ def run_shell_command():
 
 # --- Main Routing Loop ---
 def main_loop():
-    # (label, handler) — display is decoupled from routing via Choice values.
-    menu = [
-        ("Connect / Pair",          select_device_menu),
-        ("Diagnostics",             show_device_dashboard),
-        ("Apps: Sideload & Backup", apk_manager_menu),
-        ("Quick Debloat",           quick_debloat_menu),
-        ("UAD-NG Auto-Debloat",     uad_auto_debloat_menu),
-        ("Custom Debloat",          custom_debloat_menu),
-        ("Restore / Re-enable",     restore_menu),
-        ("File Transfer",           file_explorer_menu),
-        ("Input & Control",         interact_tools_menu),
-        ("Display & Screen",        display_settings_menu),
-        ("Audio & Sound",           audio_manager_menu),
-        ("Screen Capture",          screen_capture_menu),
-        ("Reboot",                  reboot_manager_menu),
-        ("Clear Caches & Reset",    clear_caches_menu),
-        ("Watch Optimizer",         watch_optimizer_menu),
-        ("ADB Shell",               run_shell_command),
+    # (section, [(label, handler), ...]) — display is decoupled from routing via Choice values.
+    sections = [
+        ("device", [
+            ("Connect / Pair",          select_device_menu),
+            ("Diagnostics",             show_device_dashboard),
+            ("ADB Shell",               run_shell_command),
+        ]),
+        ("debloat", [
+            ("Quick Debloat",           quick_debloat_menu),
+            ("UAD-NG Auto-Debloat",     uad_auto_debloat_menu),
+            ("Custom Debloat",          custom_debloat_menu),
+            ("Restore / Re-enable",     restore_menu),
+        ]),
+        ("apps & files", [
+            ("Apps: Sideload & Backup", apk_manager_menu),
+            ("File Transfer",           file_explorer_menu),
+            ("Screen Capture",          screen_capture_menu),
+        ]),
+        ("tweaks", [
+            ("Watch Optimizer",         watch_optimizer_menu),
+            ("Display & Screen",        display_settings_menu),
+            ("Audio & Sound",           audio_manager_menu),
+            ("Input & Control",         interact_tools_menu),
+        ]),
+        ("power", [
+            ("Reboot",                  reboot_manager_menu),
+            ("Clear Caches & Reset",    clear_caches_menu),
+        ]),
     ]
+    menu = [item for _, items in sections for item in items]
 
     while True:
         show_header("Main Menu")
 
-        choices = [
-            questionary.Choice(title=f"{i}. {label}", value=label)
-            for i, (label, _) in enumerate(menu, start=1)
-        ]
-        choices.append(questionary.Choice(title="0. Exit", value="__exit__"))
+        choices = []
+        for i, (name, items) in enumerate(sections):
+            if i:
+                choices.append(questionary.Separator(" "))
+            choices.append(questionary.Separator(f"{name} {'─' * (24 - len(name))}"))
+            choices += [questionary.Choice(title=f"  {label}", value=label) for label, _ in items]
+        choices.append(questionary.Separator(" "))
+        choices.append(questionary.Choice(title="  Exit", value="__exit__"))
 
-        choice = questionary.select("Select:", choices=choices).ask()
+        choice = questionary.select(
+            "", choices=choices, qmark="", instruction=" ",
+        ).ask()
 
         if not choice or choice == "__exit__":
             console.print("[cyan]Goodbye![/cyan]")
