@@ -1,0 +1,35 @@
+name: Package to debloat
+description: Suggest a package for the Quick Debloat catalog, or report one that broke something
+labels: [catalog]
+body:
+  - type: input
+    id: package
+    attributes:
+      label: Package name
+      placeholder: com.samsung.android.watch.example
+    validations:
+      required: true
+
+  - type: input
+    id: watch
+    attributes:
+      label: Watch
+      placeholder: Galaxy Watch6, Wear OS 5
+    validations:
+      required: true
+
+  - type: dropdown
+    id: kind
+    attributes:
+      label: Type
+      options:
+        - Safe to disable, add it to the catalog
+        - Disabling it broke something
+    validations:
+      required: true
+
+  - type: textarea
+    id: details
+    attributes:
+      label: Details
+      description: What the app does, or what broke after disabling it.

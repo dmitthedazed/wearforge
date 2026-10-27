@@ -1,14 +1,6 @@
 <div align="center">
 
-<pre>
-  ┌───┐
-╭─┴───┴─╮
-│   ╷   │    ╻ ╻┏━╸┏━┓┏━┓┏━╸┏━┓┏━┓┏━╸┏━╸
-│   ●─  │    ┃╻┃┣╸ ┣━┫┣┳┛┣╸ ┃ ┃┣┳┛┃╺┓┣╸
-│       │    ┗┻┛┗━╸╹ ╹╹┗╸╹  ┗━┛╹┗╸┗━┛┗━╸
-╰─┬───┬─╯    adb toolkit for wear os
-  └───┘
-</pre>
+<img src="assets/logo.svg" alt="WearForge" width="460">
 
 Debloat, tweak and manage your Wear OS watch from the terminal.
 
