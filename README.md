@@ -5,7 +5,7 @@
 Debloat, tweak and manage your Wear OS watch from the terminal.
 
 [![CI](https://github.com/dmitthedazed/wearforge/actions/workflows/ci.yml/badge.svg)](https://github.com/dmitthedazed/wearforge/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](LICENSE)
 
 </div>
 
